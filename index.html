@@ -495,7 +495,7 @@
 
         <!-- UPLOAD KHUSUS DEATH ICON -->
         <div class="form-group hidden" id="deathIconGroup">
-            <label>3. Upload .tga Death(jika ada)</label>
+            <label>3. Upload .tga Death (opsional/jika ada)</label>
             <div class="drop-zone" onclick="triggerUpload('death')">
                 <i class="fa-solid fa-skull fa-3x"></i>
                 <p style="font-weight:600; margin-top:5px;">Klik untuk upload</p>
@@ -561,7 +561,7 @@
             title.innerHTML = '<span style="color:#60a5fa"><i class="fa-solid fa-gun"></i> SENJATA PACKER</span>';
             labelName.innerText = "1. Nama Senjata:";
             inputName.placeholder = "Contoh: T77 Astel";
-            note.innerText = "Support: .mdl (v_/p_/w_), .wav, .txt, .tga (inventory)";
+            note.innerText = "Upload file Weapon Skin anda!";
             input.accept = ".mdl,.tga,.txt,.wav,.zip";
             
             deathGroup.classList.remove('hidden');
@@ -570,7 +570,7 @@
             title.innerHTML = '<span style="color:#34d399"><i class="fa-solid fa-map-location-dot"></i> MAP PACKER</span>';
             labelName.innerText = "1. Nama Map:";
             inputName.placeholder = "Contoh: Sandstrom";
-            note.innerText = "kirim file .zip map anda";
+            note.innerText = "kirim file map atau file .zip map anda";
             input.accept = ".bsp,.nav,.wad,.txt,.tga,.bmp,.mdl,.zip";
         }
         else if(mode === 'player') {
