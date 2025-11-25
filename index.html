@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSPB Packer: YasTool</title>
+    
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Modern Font: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            
+            --primary: #3b82f6; /* Blue */
+            --primary-glow: rgba(59, 130, 246, 0.5);
+            
+            --accent-green: #10b981; /* Map */
+            --accent-red: #f43f5e; /* Player/Death Tags */
+            --accent-orange: #f59e0b; /* Warning */
+            
+            --card-radius: 16px;
+            --btn-radius: 12px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-dark);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(244, 63, 94, 0.15) 0%, transparent 40%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        /* HEADER */
+        .app-header {
+            text-align: center;
+            margin-bottom: 30px;
+            animation: fadeInDown 0.8s ease;
+        }
+        .app-header h2 {
+            font-weight: 700;
+            font-size: 2rem;
+            background: linear-gradient(to right, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+            margin-bottom: 5px;
+        }
+        .app-header span { font-size: 0.9rem; color: var(--text-muted); }
+
+        /* CONTAINER GLASS */
+        .container {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            padding: 40px;
+            border-radius: var(--card-radius);
+            width: 100%;
+            max-width: 650px;
+            box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
+            overflow: visible;
+            transition: height 0.3s ease;
+        }
+
+        /* HAMBURGER MENU BUTTON */
+        .menu-toggle {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            width: 40px; height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 100;
+            display: flex; align-items: center; justify-content: center;
+            transition: 0.3s;
+        }
+        .menu-toggle:hover { background: rgba(255, 255, 255, 0.1); transform: scale(1.05); }
+
+        /* SIDEBAR & OVERLAY */
+        .sidebar-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(3px);
+            z-index: 998; opacity: 0; visibility: hidden;
+            transition: 0.3s ease;
+        }
+        .sidebar-overlay.active { opacity: 1; visibility: visible; }
+
+        .sidebar {
+            position: fixed; top: 0; left: 0;
+            width: 50vw; /* Setengah Layar */
+            max-width: 400px;
+            min-width: 250px;
+            height: 100%;
+            background: linear-gradient(160deg, #0f172a 0%, #1e293b 100%);
+            border-right: 1px solid var(--glass-border);
+            padding: 30px 20px;
+            z-index: 999;
+            transform: translateX(-100%);
+            transition: 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column; /* Penting agar footer bisa di bawah */
+        }
+        .sidebar.active { transform: translateX(0); }
+
+        .sidebar-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 30px; border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 15px;
+        }
+        .sidebar-header h3 {
+            font-size: 1.1rem; color: #60a5fa; font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        .close-sidebar {
+            background: transparent; border: none; color: var(--text-muted);
+            font-size: 1.2rem; cursor: pointer; transition: 0.2s;
+        }
+        .close-sidebar:hover { color: var(--accent-red); transform: rotate(90deg); }
+
+        .sidebar-links {
+            flex-grow: 1; /* Mengisi ruang kosong agar footer terdorong ke bawah */
+        }
+
+        .sidebar-links a {
+            display: flex; align-items: center; gap: 10px;
+            padding: 15px; margin-bottom: 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--btn-radius);
+            color: var(--text-main); text-decoration: none;
+            font-weight: 500; font-size: 0.95rem;
+            transition: 0.3s;
+        }
+        .sidebar-links a:hover {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: var(--primary);
+            transform: translateX(5px);
+        }
+        .sidebar-links i { width: 20px; text-align: center; color: var(--text-muted); }
+        .sidebar-links a:hover i { color: var(--primary); }
+
+        /* SIDEBAR FOOTER */
+        .sidebar-footer {
+            margin-top: auto;
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid var(--glass-border);
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            opacity: 0.7;
+        }
+
+
+        /* MENU GRID */
+        .menu-title { text-align: center; margin-bottom: 25px; font-weight: 600; color: var(--text-main); }
+        
+        .menu-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
+            gap: 15px; 
+            margin-bottom: 25px;
+        }
+
+        .menu-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            padding: 25px 15px;
+            border-radius: var(--card-radius);
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .menu-card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.05), transparent);
+            transform: translateX(-100%); transition: 0.5s;
+        }
+
+        .menu-card:hover { transform: translateY(-5px); border-color: rgba(255,255,255,0.3); box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
+        .menu-card:hover::before { transform: translateX(100%); }
+
+        .menu-card i { margin-bottom: 15px; transition: 0.3s; filter: drop-shadow(0 0 10px rgba(0,0,0,0.3)); }
+        .menu-card p { font-weight: 600; font-size: 0.95rem; margin: 0; }
+
+        .card-weapon:hover i { color: #60a5fa; transform: scale(1.1) rotate(-10deg); }
+        .card-map:hover i { color: #34d399; transform: scale(1.1) rotate(10deg); }
+        .card-player:hover i { color: #f472b6; transform: scale(1.1); }
+
+        /* EXTERNAL LINKS (Donate & YouTube) */
+        .external-links {
+            display: flex;
+            gap: 15px;
+            width: 100%;
+        }
+
+        .btn-link {
+            flex: 1; /* Equal width */
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--btn-radius);
+            color: var(--text-muted);
+            text-decoration: none;
+            font-weight: 600; font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+
+        /* Donate Button Style */
+        .btn-donate:hover {
+            background: rgba(244, 63, 94, 0.1);
+            border-color: var(--accent-red);
+            color: #fda4af;
+            transform: translateY(-2px);
+        }
+        .btn-donate i { color: var(--accent-red); animation: heartbeat 1.5s infinite; }
+
+        /* YouTube Button Style */
+        .btn-youtube:hover {
+            background: rgba(255, 0, 0, 0.1);
+            border-color: #ff0000;
+            color: #ff9999;
+            transform: translateY(-2px);
+        }
+        .btn-youtube i { color: #ff0000; transition: 0.3s; }
+        .btn-youtube:hover i { transform: scale(1.2); }
+
+        @keyframes heartbeat {
+            0% { transform: scale(1); }
+            14% { transform: scale(1.3); }
+            28% { transform: scale(1); }
+            42% { transform: scale(1.3); }
+            70% { transform: scale(1); }
+        }
+
+        /* FORM ELEMENTS */
+        .form-group { margin-bottom: 25px; position: relative; }
+        label { display: block; margin-bottom: 10px; font-weight: 600; font-size: 0.9rem; letter-spacing: 0.5px; }
+        
+        input[type="text"] { 
+            width: 100%; padding: 14px 18px; border-radius: var(--btn-radius); 
+            border: 1px solid var(--glass-border);
+            background: rgba(0, 0, 0, 0.2); color: white; 
+            font-size: 1rem; font-family: 'Outfit', sans-serif;
+            transition: 0.3s; outline: none;
+        }
+        input[type="text"]:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); background: rgba(0, 0, 0, 0.3); }
+
+        .preview-name { 
+            position: absolute; right: 0; top: 0; 
+            font-size: 0.75rem; background: rgba(245, 158, 11, 0.1); 
+            color: var(--accent-orange); padding: 2px 8px; border-radius: 6px;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        /* DROP ZONE */
+        .drop-zone {
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.1);
+            padding: 30px 20px; text-align: center;
+            border-radius: var(--card-radius); cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .drop-zone:hover { 
+            border-color: var(--primary); 
+            background: rgba(59, 130, 246, 0.05); 
+        }
+        .drop-zone i { margin-bottom: 10px; color: var(--text-muted); transition: 0.3s; }
+        .drop-zone:hover i { color: var(--primary); transform: translateY(-3px); }
+        
+        .note { font-size: 0.8rem; color: var(--text-muted); margin-top: 8px; display: block; }
+
+        /* FILE LIST */
+        .file-list-container {
+            max-height: 300px; overflow-y: auto;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: var(--btn-radius);
+            padding: 10px; border: 1px solid var(--glass-border);
+            margin-bottom: 25px;
+        }
+        
+        .file-list-container::-webkit-scrollbar { width: 6px; }
+        .file-list-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .file-list-container::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+        .file-item { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 12px 15px; background: rgba(255, 255, 255, 0.03);
+            margin-bottom: 8px; border-radius: 8px; 
+            border: 1px solid transparent;
+            transition: 0.2s;
+            animation: slideIn 0.3s ease forwards;
+        }
+        .file-item:hover { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.1); }
+        .file-item.manual-item { border-left: 3px solid var(--accent-orange); }
+
+        .file-info strong { font-size: 0.9rem; display: block; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px;}
+
+        /* TAGS */
+        .char-tag {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 10px; border-radius: 20px;
+            font-size: 0.75rem; font-weight: 700; margin-top: 5px;
+            background: rgba(16, 185, 129, 0.15); color: #6ee7b7;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        .death-tag { background: rgba(244, 63, 94, 0.15); color: #fda4af; border-color: rgba(244, 63, 94, 0.2); }
+        
+        /* DROPDOWN MINI */
+        select.mini-select {
+            background: #1e293b; color: white; border: 1px solid var(--glass-border);
+            padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; margin-top: 6px;
+            width: 100%; cursor: pointer; outline: none;
+        }
+        select.mini-select:focus { border-color: var(--primary); }
+
+        /* BUTTONS */
+        .btn-action { 
+            width: 100%; padding: 16px; border: none; border-radius: var(--btn-radius);
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white; font-size: 1rem; font-weight: 700; letter-spacing: 0.5px;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+            transition: 0.3s; position: relative; overflow: hidden;
+        }
+        .btn-action:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(37, 99, 235, 0.4); }
+        .btn-action:active { transform: translateY(0); }
+        
+        .btn-delete { 
+            background: rgba(244, 63, 94, 0.1); border: none; color: var(--accent-red);
+            width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; transition: 0.2s;
+        }
+        .btn-delete:hover { background: var(--accent-red); color: white; }
+
+        .back-btn {
+            background: transparent; border: none; color: var(--text-muted);
+            cursor: pointer; margin-bottom: 20px; font-size: 0.9rem;
+            display: inline-flex; align-items: center; gap: 8px; transition: 0.2s;
+        }
+        .back-btn:hover { color: var(--text-main); transform: translateX(-5px); }
+
+        /* ALERTS & LOADER */
+        .alert-box { 
+            background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.3);
+            color: #fda4af; padding: 15px; border-radius: var(--btn-radius);
+            margin-bottom: 20px; font-size: 0.9rem; display: none;
+        }
+        #loader { display: none; text-align: center; color: var(--primary); margin: 15px 0; font-weight: 600; }
+
+        .hidden { display: none !important; }
+
+        /* ANIMATIONS */
+        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container { padding: 25px 20px; }
+            .app-header h2 { font-size: 1.5rem; }
+            .menu-grid { grid-template-columns: 1fr; }
+            .external-links { flex-direction: column; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<!-- SIDEBAR CONTENT -->
+<div class="sidebar" id="sidebarMenu">
+    <div class="sidebar-header">
+        <h3>WEB LAINNYA</h3>
+        <button class="close-sidebar" onclick="toggleSidebar()">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+    
+    <div class="sidebar-links">
+        <a href="https://maize-skateboard-1cd.notion.site/SKINS-CSPB-V18-V20-1-28ecaae0bb8380abaa72c20400e39291?source=copy_link" target="_blank">
+            <i class="fa-solid fa-gamepad"></i> WEB SKIN CSPB
+        </a>
+        <a href="https://tutorial-cspb-mobile.vercel.app/" target="_blank">
+            <i class="fa-solid fa-book-open"></i> WEB TUTORIAL CSPB
+        </a>
+    </div>
+
+    <!-- NEW FOOTER -->
+    <div class="sidebar-footer">
+        @yasaaoursea
+    </div>
+</div>
+
+<div class="app-header">
+    <h2>CSPB PACKER</h2>
+    <span>v1.0</span>
+</div>
+
+<div class="container">
+    
+    <!-- TOMBOL HAMBURGER MENU -->
+    <button class="menu-toggle" onclick="toggleSidebar()">
+        <i class="fa-solid fa-bars fa-lg"></i>
+    </button>
+
+    <!-- MAIN MENU -->
+    <div id="main-menu">
+        <h3 class="menu-title">Packer List</h3>
+        <div class="menu-grid">
+            <div class="menu-card card-weapon" onclick="openTool('weapon')">
+                <i class="fa-solid fa-gun fa-3x" style="color:#60a5fa"></i>
+                <p>Skin Senjata</p>
+            </div>
+            <div class="menu-card card-map" onclick="openTool('map')">
+                <i class="fa-solid fa-map-location-dot fa-3x" style="color:#34d399"></i>
+                <p>Map</p>
+            </div>
+            <div class="menu-card card-player" onclick="openTool('player')">
+                <i class="fa-solid fa-users-viewfinder fa-3x" style="color:#f472b6"></i>
+                <p>Karakter</p>
+            </div>
+        </div>
+
+        <!-- EXTERNAL LINKS (DONATE & YOUTUBE) -->
+        <div class="external-links">
+            <a href="https://sociabuzz.com/yasaaoursea/support" target="_blank" class="btn-link btn-donate">
+                <i class="fa-solid fa-heart"></i> Donate
+            </a>
+            <a href="https://youtube.com/@yasaaoursea" target="_blank" class="btn-link btn-youtube">
+                <i class="fa-brands fa-youtube"></i> YouTube
+            </a>
+        </div>
+    </div>
+
+    <!-- TOOL INTERFACE -->
+    <div id="tool-interface" class="hidden">
+        <button class="back-btn" onclick="goBack()">
+            <i class="fa-solid fa-arrow-left-long"></i> Kembali
+        </button>
+        
+        <div id="duplicateAlert" class="alert-box"></div>
+
+        <!-- Dynamic Title -->
+        <h3 id="modeTitle" style="text-align:center; margin-bottom:25px; font-size:1.2rem; border-bottom:1px solid var(--glass-border); padding-bottom:15px;"></h3>
+
+        <div class="form-group">
+            <label id="labelModName">1. Nama Mod:</label>
+            <div style="position: relative;">
+                <input type="text" id="modName" autocomplete="off" placeholder="" oninput="updatePreview()">
+                <div class="preview-name">Output: <b id="folderPreview">@yasaaoursea_...</b></div>
+            </div>
+        </div>
+
+        <!-- UPLOAD UTAMA -->
+        <div class="form-group">
+            <label id="labelUpload">2. Upload File:</label>
+            <div class="drop-zone" onclick="triggerUpload('main')">
+                <i class="fa-solid fa-cloud-arrow-up fa-3x"></i>
+                <p style="font-weight:600; margin-top:5px;">Klik untuk Upload</p>
+                <p class="note" id="uploadNote">Support: ...</p>
+                <input type="file" id="fileInput" multiple style="display: none;" onchange="handleUpload(this.files, false)">
+            </div>
+        </div>
+
+        <!-- UPLOAD KHUSUS DEATH ICON -->
+        <div class="form-group hidden" id="deathIconGroup">
+            <label>3. Upload .tga Death(jika ada)</label>
+            <div class="drop-zone" onclick="triggerUpload('death')">
+                <i class="fa-solid fa-skull fa-3x"></i>
+                <p style="font-weight:600; margin-top:5px;">Klik untuk upload</p>
+                <p class="note">.tga only</p>
+                <input type="file" id="deathInput" multiple accept=".tga" style="display: none;" onchange="handleUpload(this.files, true)">
+            </div>
+        </div>
+
+        <div id="loader"><i class="fa-solid fa-circle-notch fa-spin"></i> Memproses file...</div>
+
+        <div class="file-list-container" id="fileListContainer">
+            <div style="text-align:center; color:var(--text-muted); padding:40px; display:flex; flex-direction:column; align-items:center; gap:10px;">
+                <i class="fa-regular fa-folder-open fa-2x" style="opacity:0.5"></i>
+                <span>Belum ada file yang dipilih.</span>
+            </div>
+        </div>
+
+        <button class="btn-action" onclick="processAndDownload()">
+            <i class="fa-solid fa-box-archive"></i> &nbsp;PACKER & DOWNLOAD
+        </button>
+    </div>
+
+</div>
+
+<!-- Logic JS -->
+<script>
+    // SIDEBAR TOGGLE FUNCTION
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebarMenu');
+        const overlay = document.getElementById('sidebarOverlay');
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+    }
+
+    let currentMode = '';
+    let fileQueue = []; 
+
+    const redTeam = ['arctic', 'guerilla', 'leet', 'militia', 'terror', 'redfemale1'];
+    const blueTeam = ['gign', 'gsg9', 'sas', 'spetsnaz', 'urban'];
+    const validChars = [...redTeam, ...blueTeam];
+
+    function openTool(mode) {
+        currentMode = mode;
+        document.getElementById('main-menu').classList.add('hidden');
+        document.getElementById('tool-interface').classList.remove('hidden');
+        
+        const title = document.getElementById('modeTitle');
+        const note = document.getElementById('uploadNote');
+        const input = document.getElementById('fileInput');
+        const labelName = document.getElementById('labelModName'); 
+        const inputName = document.getElementById('modName'); 
+        const labelUpload = document.getElementById('labelUpload');
+        
+        const deathGroup = document.getElementById('deathIconGroup');
+
+        // Reset
+        deathGroup.classList.add('hidden');
+        labelUpload.innerText = "2. Upload File (ZIP / Manual):";
+        inputName.value = '';
+        updatePreview();
+
+        if(mode === 'weapon') {
+            title.innerHTML = '<span style="color:#60a5fa"><i class="fa-solid fa-gun"></i> SENJATA PACKER</span>';
+            labelName.innerText = "1. Nama Senjata:";
+            inputName.placeholder = "Contoh: T77 Astel";
+            note.innerText = "Support: .mdl (v_/p_/w_), .wav, .txt, .tga (inventory)";
+            input.accept = ".mdl,.tga,.txt,.wav,.zip";
+            
+            deathGroup.classList.remove('hidden');
+        } 
+        else if(mode === 'map') {
+            title.innerHTML = '<span style="color:#34d399"><i class="fa-solid fa-map-location-dot"></i> MAP PACKER</span>';
+            labelName.innerText = "1. Nama Map:";
+            inputName.placeholder = "Contoh: Sandstrom";
+            note.innerText = "kirim file .zip map anda";
+            input.accept = ".bsp,.nav,.wad,.txt,.tga,.bmp,.mdl,.zip";
+        }
+        else if(mode === 'player') {
+            title.innerHTML = '<span style="color:#f472b6"><i class="fa-solid fa-users-viewfinder"></i> CHAR PACKER</span>';
+            labelName.innerText = "1. Nama Char:";
+            inputName.placeholder = "Contoh: Char Wraith";
+            note.innerText = "Kirim file/.zip char anda";
+            input.accept = ".mdl,.bmp,.zip";
+        }
+        resetAlert();
+    }
+
+    function goBack() {
+        document.getElementById('main-menu').classList.remove('hidden');
+        document.getElementById('tool-interface').classList.add('hidden');
+        fileQueue = []; 
+        document.getElementById('modName').value = '';
+        renderFileList();
+        resetAlert();
+    }
+
+    function updatePreview() {
+        const val = document.getElementById('modName').value;
+        document.getElementById('folderPreview').innerText = val ? `@yasaaoursea_${val}` : "@yasaaoursea_...";
+    }
+
+    function triggerUpload(type) { 
+        if(type === 'death') document.getElementById('deathInput').click();
+        else document.getElementById('fileInput').click(); 
+    }
+    
+    function resetAlert() {
+        const alertBox = document.getElementById('duplicateAlert');
+        alertBox.style.display = 'none';
+        alertBox.innerText = '';
+    }
+
+    function isDuplicate(fileName) {
+        return fileQueue.some(item => item.name === fileName);
+    }
+
+    function detectCharacter(filename, fullPath) {
+        const nameNoExt = filename.toLowerCase().split('.')[0]; 
+        const path = fullPath ? fullPath.toLowerCase() : '';
+        for (const char of validChars) {
+            if (nameNoExt === char || nameNoExt === (char + "t") || path.includes(`/${char}/`) || path.startsWith(`${char}/`)) {
+                return char;
+            }
+        }
+        return null;
+    }
+
+    function getTeamInfo(charName) {
+        if (!charName) return { icon: '' };
+        if (redTeam.includes(charName)) return { icon: '<span style="color:#f87171">●</span>' }; 
+        if (blueTeam.includes(charName)) return { icon: '<span style="color:#60a5fa">●</span>' }; 
+        return { icon: '' };
+    }
+
+    function sortFileQueue() {
+        fileQueue.sort((a, b) => {
+            if (a.autoDetected !== b.autoDetected) return a.autoDetected ? 1 : -1;
+            if (!a.autoDetected) {
+                if (!a.targetChar && b.targetChar) return -1;
+                if (a.targetChar && !b.targetChar) return 1;
+            }
+            const getTeamScore = (char) => {
+                if (!char) return -1;
+                if (blueTeam.includes(char)) return 0;
+                if (redTeam.includes(char)) return 1;
+                return 2;
+            };
+            const scoreA = getTeamScore(a.targetChar);
+            const scoreB = getTeamScore(b.targetChar);
+            if (scoreA !== scoreB) return scoreA - scoreB;
+            if (a.targetChar < b.targetChar) return -1;
+            if (a.targetChar > b.targetChar) return 1;
+            return 0;
+        });
+    }
+
+    async function handleUpload(files, isDeathIcon = false) {
+        resetAlert();
+        const loader = document.getElementById('loader');
+        loader.style.display = 'block';
+        
+        let duplicatesFound = [];
+        let filesArray = Array.from(files);
+        const allowedExt = isDeathIcon ? ['tga'] : ['mdl', 'wav', 'tga', 'txt', 'bsp', 'nav', 'wad', 'bmp', 'res'];
+
+        for (let file of filesArray) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (ext === 'zip' && !isDeathIcon) {
+                await processZip(file);
+            } else if (allowedExt.includes(ext)) {
+                if (isDuplicate(file.name)) {
+                    duplicatesFound.push(file.name);
+                } else {
+                    let detected = null;
+                    if (currentMode === 'player') detected = detectCharacter(file.name, "");
+                    
+                    fileQueue.push({ 
+                        name: file.name, 
+                        data: file, 
+                        fullPath: "", 
+                        targetChar: detected, 
+                        autoDetected: !!detected,
+                        isDeathIcon: isDeathIcon 
+                    });
+                }
+            }
+        }
+
+        if (duplicatesFound.length > 0) {
+            const alertBox = document.getElementById('duplicateAlert');
+            alertBox.style.display = 'block';
+            alertBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <b>Duplikat Diabaikan:</b><br><span style="font-size:0.8em">${duplicatesFound.join(', ')}</span>`;
+        }
+
+        if(currentMode === 'player') sortFileQueue();
+        loader.style.display = 'none';
+        document.getElementById('fileInput').value = ''; 
+        document.getElementById('deathInput').value = ''; 
+        renderFileList();
+    }
+
+    async function processZip(zipFile) {
+        try {
+            const zipContent = await JSZip.loadAsync(zipFile);
+            const promises = [];
+            let zipDuplicates = [];
+            const allowedExt = ['mdl', 'wav', 'tga', 'txt', 'bsp', 'nav', 'wad', 'bmp', 'res'];
+
+            zipContent.forEach((relativePath, zipEntry) => {
+                if (!zipEntry.dir) {
+                    const promise = zipEntry.async("blob").then(blob => {
+                        const cleanName = zipEntry.name.split('/').pop();
+                        const ext = cleanName.split('.').pop().toLowerCase();
+                        if (allowedExt.includes(ext)) {
+                            if (isDuplicate(cleanName)) {
+                                zipDuplicates.push(cleanName);
+                            } else {
+                                let detected = null;
+                                if (currentMode === 'player') detected = detectCharacter(cleanName, zipEntry.name);
+                                fileQueue.push({ name: cleanName, data: blob, fullPath: zipEntry.name, targetChar: detected, autoDetected: !!detected, isDeathIcon: false });
+                            }
+                        }
+                    });
+                    promises.push(promise);
+                }
+            });
+            await Promise.all(promises);
+            if (zipDuplicates.length > 0) {
+                const alertBox = document.getElementById('duplicateAlert');
+                alertBox.style.display = 'block';
+                alertBox.innerHTML += `<br><b>Duplikat ZIP:</b> ${zipDuplicates.join(', ')}`;
+            }
+        } catch (err) { alert("Error ZIP: " + err.message); }
+    }
+
+    function updateFileTarget(index, value) {
+        fileQueue[index].targetChar = value;
+        if(currentMode === 'player') sortFileQueue();
+        renderFileList();
+    }
+
+    function generateTargetDropdown(index, selectedValue) {
+        const buildOptions = (teamArray) => {
+            return teamArray.map(char => 
+                `<option value="${char}" ${char === selectedValue ? 'selected' : ''}>${char.toUpperCase()}</option>`
+            ).join('');
+        };
+        return `
+            <select class="mini-select" onchange="updateFileTarget(${index}, this.value)">
+                <option value="">-- Pilih Target --</option>
+                <optgroup label="🔴 RED TEAM">
+                    ${buildOptions(redTeam)}
+                </optgroup>
+                <optgroup label="🔵 BLUE TEAM">
+                    ${buildOptions(blueTeam)}
+                </optgroup>
+            </select>
+        `;
+    }
+
+    function renderFileList() {
+        const container = document.getElementById('fileListContainer');
+        if (fileQueue.length === 0) {
+            container.innerHTML = `
+                <div style="text-align:center; color:var(--text-muted); padding:40px; display:flex; flex-direction:column; align-items:center; gap:10px;">
+                    <i class="fa-regular fa-folder-open fa-2x" style="opacity:0.5"></i>
+                    <span>Belum ada file yang dipilih.</span>
+                </div>`;
+            return;
+        }
+        
+        let html = '';
+        
+        fileQueue.forEach((item, index) => {
+            let controlHTML = '';
+            const manualClass = (currentMode === 'player' && !item.autoDetected) ? 'manual-item' : '';
+            
+            if (item.isDeathIcon) {
+                controlHTML = `<span class="char-tag death-tag"><i class="fa-solid fa-skull"></i> DEATH ICON</span>`;
+            }
+            else if (currentMode === 'player') {
+                if (item.targetChar) {
+                    const teamInfo = getTeamInfo(item.targetChar);
+                    controlHTML = `
+                        <div style="margin-top:5px;">
+                            <span class="char-tag">
+                                ${teamInfo.icon} ${item.targetChar.toUpperCase()}
+                                ${item.autoDetected ? '<i class="fa-solid fa-check-circle" style="margin-left:5px;"></i>' : ''}
+                            </span>
+                        </div>
+                    `;
+                    if(!item.autoDetected){
+                         controlHTML += `<div style="margin-top:2px; font-size:0.75em; color:#f59e0b; cursor:pointer; text-decoration:underline" onclick="this.nextElementSibling.style.display='block'; this.style.display='none'">[Ganti Target]</div>`;
+                         controlHTML += `<div style="display:none;">${generateTargetDropdown(index, item.targetChar)}</div>`;
+                    }
+                } else {
+                    controlHTML = `
+                        <span class="unregistered-warning" style="color:#f59e0b; font-size:0.8em; display:block; margin-top:4px;"><i class="fa-solid fa-circle-exclamation"></i> Wajib pilih char:</span>
+                        ${generateTargetDropdown(index, '')}
+                    `;
+                }
+            }
+
+            html += `
+                <div class="file-item ${manualClass}">
+                    <div class="file-info" style="flex-grow:1; padding-right:10px;">
+                        <strong>${item.name}</strong>
+                        ${controlHTML}
+                    </div>
+                    <button class="btn-delete" onclick="removeFile(${index})" title="Hapus file"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    function removeFile(index) {
+        fileQueue.splice(index, 1);
+        renderFileList();
+    }
+
+    async function processAndDownload() {
+        const nameInput = document.getElementById('modName').value.trim();
+        if (!nameInput) return alert("Isi nama mod dulu!");
+        if (fileQueue.length === 0) return alert("Upload file game dulu!");
+
+        if (currentMode === 'player') {
+            const unresolvedFiles = fileQueue.filter(f => (f.name.endsWith('.mdl') || f.name.endsWith('.bmp')) && !f.targetChar);
+            if (unresolvedFiles.length > 0) return alert(`Ada file karakter yang belum dipilih tujuannya!`);
+        }
+
+        const zip = new JSZip();
+        const rootName = `@yasaaoursea_${nameInput}`;
+        const root = zip.folder(rootName);
+        const date = new Date().toLocaleString('id-ID'); 
+        
+        const fileListString = fileQueue.map(f => {
+            let info = f.name;
+            if(f.isDeathIcon) info += " [DEATH ICON]";
+            else if(currentMode === 'player') {
+                let charStr = f.targetChar ? f.targetChar : "Unknown";
+                info += ` (${charStr})`;
+            }
+            return `- ${info}`;
+        }).join('\n');
+        
+        let instructions = "";
+        let modeLabel = "";
+
+        if(currentMode === 'weapon') { modeLabel = "Senjata"; instructions = `3. Salin folder "com.cspb.m" dan tempel ke folder "data".`; } 
+        else if (currentMode === 'map') { modeLabel = "Map"; instructions = `3. Salin folder "com.cspb.m" dan tempel ke folder "data".`; }
+        else if (currentMode === 'player') { modeLabel = "Character "; instructions = `3. Salin folder "com.cspb.m" dan tempel ke folder "data".`; }
+
+        const readmeContent = `
+==============================================
+GENERATED BY YASAAOURSEA WEB
+==============================================
+Jenis Mod  : ${modeLabel}
+Nama Mod   : ${nameInput}
+Tanggal    : ${date}
+Jumlah File: ${fileQueue.length}
+Nama file :
+${fileListString}
+
+CARA PEMASANGAN:
+1. Ekstrak folder "${rootName}" ini.
+2. Di dalamnya ada folder "com.cspb.m".
+${instructions}
+4. Jika diminta menimpa (Overwrite/Replace), pilih "GANTI" dan lakukan ke semua file!
+
+Terima kasih telah menggunakan tools kami!
+`;
+        root.file("BACA_SAYA.txt", readmeContent.trim());
+
+        const cspb = root.folder("com.cspb.m").folder("files").folder("cspb");
+        const downloaded = cspb.folder("downloaded"); 
+
+        let count = 0;
+
+        fileQueue.forEach(f => {
+            const ext = f.name.split('.').pop().toLowerCase();
+            const lowerName = f.name.toLowerCase(); 
+            
+            if (currentMode === 'weapon') {
+                if (f.isDeathIcon) {
+                    cspb.folder("gfx").folder("billflx").folder("death").folder("weapons").file(f.name, f.data);
+                    count++;
+                } else {
+                    let target = null;
+                    if (ext === 'mdl') {
+                        if (lowerName.startsWith('p_') || lowerName.startsWith('w_')) target = cspb.folder("models");
+                        else target = cspb.folder("models").folder("billflx");
+                    } 
+                    else if (ext === 'tga') target = cspb.folder("gfx").folder("billflx").folder("weapons");
+                    else if (ext === 'txt') target = cspb.folder("scripts");
+                    else if (ext === 'wav') target = cspb.folder("sound").folder("weapons");
+                    if (target) { target.file(f.name, f.data); count++; }
+                }
+            }
+            else if (currentMode === 'map') {
+                let processed = false;
+                if (['bsp', 'nav', 'res'].includes(ext)) { downloaded.folder("maps").file(f.name, f.data); processed = true; }
+                if (ext === 'wad') { downloaded.folder("maps").file(f.name, f.data); downloaded.file(f.name, f.data); processed = true; }
+                if (ext === 'txt') { downloaded.folder("maps").file(f.name, f.data); downloaded.folder("overviews").file(f.name, f.data); processed = true; }
+                if (ext === 'bmp' || ext === 'tga') { downloaded.folder("gfx").folder("env").file(f.name, f.data); downloaded.folder("overviews").file(f.name, f.data); if(ext==='bmp') downloaded.folder("levelshots").file(f.name, f.data); processed = true; }
+                if (ext === 'mdl') {
+                    let targetPath = downloaded.folder("models");
+                    if (f.fullPath && f.fullPath.includes('/')) {
+                        const parts = f.fullPath.split('/'); parts.pop();
+                        const modelIndex = parts.indexOf('models');
+                        if (modelIndex !== -1) {
+                            const subFolders = parts.slice(modelIndex + 1);
+                            subFolders.forEach(sub => targetPath = targetPath.folder(sub));
+                        } else {
+                            parts.forEach(sub => targetPath = targetPath.folder(sub));
+                        }
+                    } 
+                    targetPath.file(f.name, f.data); processed = true;
+                }
+                if (processed) count++;
+            }
+            else if (currentMode === 'player') {
+                let target = null;
+                if ((ext === 'mdl' || ext === 'bmp') && f.targetChar) {
+                    target = cspb.folder("models").folder("player").folder(f.targetChar);
+                }
+                if (target) { target.file(f.name, f.data); count++; }
+            }
+        });
+
+        if (count === 0) return alert("Tidak ada file valid yang bisa diproses.");
+
+        try {
+            const content = await zip.generateAsync({type:"blob"});
+            saveAs(content, `${rootName}.zip`);
+        } catch (err) {
+            const content = await zip.generateAsync({type:"base64"});
+            window.location.href = "data:application/zip;base64," + content;
+        }
+    }
+</script>
+
+</body>
+</html>
